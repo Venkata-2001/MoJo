@@ -163,10 +163,13 @@ async def event_stream(query: str, input_time: float) -> AsyncGenerator[str, Non
     human_secs = max(input_time, 1.0)
     mojo_score = round(total_tokens / human_secs, 1)
 
-    yield (
-        f"data: {json.dumps({'type': 'mojo', 'score': mojo_score, "
-        f"'total_tokens': total_tokens, 'human_time': round(human_secs, 1)})}\n\n"
-    )
+    mojo_payload = json.dumps({
+        "type": "mojo",
+        "score": mojo_score,
+        "total_tokens": total_tokens,
+        "human_time": round(human_secs, 1),
+    })
+    yield f"data: {mojo_payload}\n\n"
     yield 'data: {"type":"done"}\n\n'
 
 
@@ -183,7 +186,7 @@ async def analyze(request: QueryRequest):
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    html_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "index.html")
     with open(html_path, encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
