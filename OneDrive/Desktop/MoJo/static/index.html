@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoJo — Multi-Agent Orchestrator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0D1117;
+      --surface:   #161B22;
+      --surface2:  #1C2330;
+      --border:    #30363D;
+      --text:      #E6EDF3;
+      --muted:     #8B949E;
+      --blue:      #4A9EFF;
+      --teal:      #00D4AA;
+      --red:       #FF6B6B;
+      --gold:      #FFD700;
+      --radius:    12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--blue), var(--teal));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+    .tagline {
+      color: var(--muted);
+      font-size: 0.85rem;
+      flex: 1;
+    }
+    .pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 0.3rem 0.85rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+    }
+
+    /* ── Query box ── */
+    .query-section {
+      margin-bottom: 2.5rem;
+    }
+    .query-section label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+    }
+    .input-wrap {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+    textarea {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+      padding: 0.9rem 1.1rem;
+      resize: vertical;
+      min-height: 80px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    textarea:focus { border-color: var(--blue); }
+    textarea::placeholder { color: var(--muted); }
+
+    button#runBtn {
+      background: linear-gradient(135deg, #1A6EFF, #00B8A9);
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 0.9rem 1.8rem;
+      white-space: nowrap;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    button#runBtn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    button#runBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ── Section headings ── */
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Agent grid ── */
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    @media (max-width: 768px) {
+      .agent-grid { grid-template-columns: 1fr; }
+    }
+
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--agent-color, var(--border));
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      min-height: 220px;
+      transition: border-color 0.3s;
+    }
+    .agent-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+    .agent-icon { font-size: 1.1rem; }
+    .agent-name {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--agent-color, var(--text));
+    }
+    .agent-badge {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: var(--muted);
+      background: var(--surface2);
+      border-radius: 6px;
+      padding: 0.15rem 0.5rem;
+    }
+    .agent-output {
+      font-size: 0.85rem;
+      color: var(--muted);
+      white-space: pre-wrap;
+      line-height: 1.7;
+    }
+    .agent-output.loaded { color: var(--text); }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--agent-color, var(--blue));
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Synthesis card ── */
+    .synthesis-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--blue);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      min-height: 80px;
+    }
+    .synthesis-output {
+      font-size: 0.9rem;
+      line-height: 1.75;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+    .synthesis-output.loaded { color: var(--text); }
+
+    /* ── MoJo Score ── */
+    .mojo-section {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: none;
+    }
+    .mojo-section.visible { display: block; }
+
+    .mojo-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 0.5rem;
+    }
+    .mojo-number {
+      font-size: 5.5rem;
+      font-weight: 900;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--gold), #FFA500);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -3px;
+      transition: all 0.5s ease;
+    }
+    .mojo-unit {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+    .mojo-meta {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .mojo-meta span b { color: var(--text); }
+
+    /* ── Status bar ── */
+    #statusBar {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+      min-height: 1.2em;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">MoJo</span>
+  <span class="tagline">Multi-Agent Orchestration System</span>
+  <span class="pill">3 agents · parallel · Claude Haiku</span>
+</header>
+
+<main>
+  <!-- Query -->
+  <div class="query-section">
+    <label for="queryInput">Your Query</label>
+    <div class="input-wrap">
+      <textarea
+        id="queryInput"
+        placeholder="Ask anything — legal, strategic, technical… e.g. &quot;What are the key risks of an AI liability clause in a SaaS contract?&quot;"
+        rows="3"
+      ></textarea>
+      <button id="runBtn" onclick="runAnalysis()">Run MoJo ⚡</button>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div id="statusBar"></div>
+
+  <!-- Agent cards -->
+  <p class="section-title">Agent Outputs</p>
+  <div class="agent-grid" id="agentGrid">
+    <div class="agent-card" id="card-researcher" style="--agent-color: #4A9EFF">
+      <div class="agent-header">
+        <span class="agent-icon">🔬</span>
+        <span class="agent-name" style="color:#4A9EFF">Research Agent</span>
+      </div>
+      <div class="agent-output" id="out-researcher">Waiting for query…</div>
+    </div>
+    <div class="agent-card" id="card-strategist" style="--agent-color: #00D4AA">
+      <div class="agent-header">
+        <span class="agent-icon">⚡</span>
+        <span class="agent-name" style="color:#00D4AA">Strategy Agent</span>
+      </div>
+      <div class="agent-output" id="out-strategist">Waiting for query…</div>
+    </div>
+    <div class="agent-card" id="card-critic" style="--agent-color: #FF6B6B">
+      <div class="agent-header">
+        <span class="agent-icon">🎯</span>
+        <span class="agent-name" style="color:#FF6B6B">Devil's Advocate</span>
+      </div>
+      <div class="agent-output" id="out-critic">Waiting for query…</div>
+    </div>
+  </div>
+
+  <!-- Synthesis -->
+  <p class="section-title">Synthesis</p>
+  <div class="synthesis-card">
+    <div class="synthesis-output" id="synthesisOut">Run a query to see the integrated synthesis.</div>
+  </div>
+
+  <!-- MoJo Score -->
+  <div class="mojo-section" id="mojoSection">
+    <div class="mojo-label">Your MoJo Score</div>
+    <div class="mojo-number" id="mojoScore">0</div>
+    <div class="mojo-unit">tokens out / second in</div>
+    <div class="mojo-meta">
+      <span><b id="metaTokens">—</b> total tokens generated</span>
+      <span><b id="metaTime">—</b>s human input time</span>
+    </div>
+  </div>
+</main>
+
+<script>
+  let inputStartTime = null;
+
+  const queryInput = document.getElementById('queryInput');
+  queryInput.addEventListener('focus', () => {
+    if (!inputStartTime) inputStartTime = Date.now();
+  });
+  queryInput.addEventListener('input', () => {
+    if (!inputStartTime) inputStartTime = Date.now();
+  });
+
+  function setStatus(msg) {
+    document.getElementById('statusBar').textContent = msg;
+  }
+
+  function resetUI() {
+    ['researcher', 'strategist', 'critic'].forEach(id => {
+      const el = document.getElementById('out-' + id);
+      el.className = 'agent-output';
+      el.innerHTML = '<span class="spinner"></span> Running…';
+    });
+    const syn = document.getElementById('synthesisOut');
+    syn.className = 'synthesis-output';
+    syn.textContent = 'Waiting for agents…';
+    document.getElementById('mojoSection').classList.remove('visible');
+    document.getElementById('mojoScore').textContent = '0';
+  }
+
+  function handleEvent(event) {
+    if (event.type === 'agent') {
+      const d = event.data;
+      const el = document.getElementById('out-' + d.id);
+      if (el) {
+        if (d.error) {
+          el.className = 'agent-output';
+          el.textContent = '⚠ Error: ' + d.error;
+        } else {
+          el.className = 'agent-output loaded';
+          el.textContent = d.output;
+          // Add badge
+          const card = document.getElementById('card-' + d.id);
+          let badge = card.querySelector('.agent-badge');
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'agent-badge';
+            card.querySelector('.agent-header').appendChild(badge);
+          }
+          badge.textContent = d.tokens + ' tok · ' + d.latency + 's';
+        }
+      }
+    } else if (event.type === 'status') {
+      setStatus(event.message);
+    } else if (event.type === 'synthesis') {
+      const syn = document.getElementById('synthesisOut');
+      syn.className = 'synthesis-output loaded';
+      syn.textContent = event.output;
+    } else if (event.type === 'mojo') {
+      const section = document.getElementById('mojoSection');
+      section.classList.add('visible');
+      // Animate score
+      const scoreEl = document.getElementById('mojoScore');
+      const target = event.score;
+      let current = 0;
+      const step = target / 40;
+      const interval = setInterval(() => {
+        current = Math.min(current + step, target);
+        scoreEl.textContent = Math.round(current);
+        if (current >= target) clearInterval(interval);
+      }, 25);
+      document.getElementById('metaTokens').textContent = event.total_tokens.toLocaleString();
+      document.getElementById('metaTime').textContent = event.human_time;
+      setStatus('Done.');
+    } else if (event.type === 'error') {
+      setStatus('Error: ' + event.message);
+    } else if (event.type === 'done') {
+      document.getElementById('runBtn').disabled = false;
+    }
+  }
+
+  async function runAnalysis() {
+    const query = queryInput.value.trim();
+    if (!query) { queryInput.focus(); return; }
+
+    const inputTime = inputStartTime
+      ? (Date.now() - inputStartTime) / 1000
+      : 5;
+
+    document.getElementById('runBtn').disabled = true;
+    resetUI();
+    setStatus('Dispatching 3 agents in parallel…');
+    inputStartTime = null;
+
+    try {
+      const response = await fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, input_time: inputTime }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        setStatus('Error: ' + (err.detail || 'Unknown error'));
+        document.getElementById('runBtn').disabled = false;
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete last line
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const evt = JSON.parse(line.slice(6));
+              handleEvent(evt);
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (err) {
+      setStatus('Network error: ' + err.message);
+      document.getElementById('runBtn').disabled = false;
+    }
+  }
+
+  // Allow Ctrl+Enter to submit
+  queryInput.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runAnalysis();
+  });
+</script>
+</body>
+</html>
